@@ -3,6 +3,9 @@ const cors = require('cors');
 const axios = require('axios');
 require('dotenv').config();
 
+// Import the Google Generative AI package properly
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+
 const app = express();
 const port = process.env.PORT || 3000;
 
