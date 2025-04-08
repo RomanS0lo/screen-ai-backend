@@ -62,9 +62,9 @@ app.post('/api/analyze-screenshot', async (req, res) => {
     console.log("Image data received, length:", imageData.length);
     
     try {
-      // Initialize the Gemini Pro Vision model
+      // Initialize the Gemini 1.5 Flash model (replacing the deprecated gemini-pro-vision)
       const model = genAI.getGenerativeModel({ 
-        model: "gemini-pro-vision",
+        model: "gemini-1.5-flash",  // Updated model name
         generationConfig: {
           temperature: 0.4,
           maxOutputTokens: 1500,
