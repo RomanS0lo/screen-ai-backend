@@ -7,7 +7,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Define your API key (the one your extension should use)
-const API_SECRET_KEY = 'test-key123';
+const API_SECRET_KEY = process.env.API_SECRET_KEY || 'test-key123';
 
 // Detailed startup logging
 console.log("Server starting up");
@@ -60,6 +60,7 @@ app.post('/api/analyze-screenshot', async (req, res) => {
       return res.status(500).json({ error: 'Server configuration error: Missing API key' });
     }
     
+    console.log("Anthropic API Key:", process.env.ANTHROPIC_API_KEY.substring(0, 15) + "...");
     console.log("Preparing payload for Anthropic API");
     
     // Prepare payload for Anthropic API
@@ -89,43 +90,62 @@ app.post('/api/analyze-screenshot', async (req, res) => {
 
     console.log("Sending request to Anthropic API with model:", payload.model);
     
-    // Make request to Anthropic API
-    const response = await axios.post('https://api.anthropic.com/v1/messages', payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      timeout: 60000 // 60 second timeout to handle long processing times
-    });
-
-    console.log("Received response from Anthropic API");
-    
-    // Send response back to client
-    res.json({
-      response: response.data.content[0].text
-    });
-    
-    console.log("Successfully sent response back to client");
-  } catch (error) {
-    console.error('Error processing screenshot:', error);
-    
-    if (error.response) {
-      console.error('API Error Response:', {
-        status: error.response.status,
-        headers: error.response.headers,
-        data: error.response.data
+    try {
+      // Make request to Anthropic API
+      const response = await axios.post('https://api.anthropic.com/v1/messages', payload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        timeout: 60000 // 60 second timeout to handle long processing times
       });
-    } else if (error.request) {
-      console.error('No response received:', error.request);
-    } else {
-      console.error('Error setting up request:', error.message);
+
+      console.log("Received response from Anthropic API with status:", response.status);
+      console.log("Response type:", response.data.content[0].type);
+      console.log("Response text preview:", response.data.content[0].text.substring(0, 100) + "...");
+      
+      // Send response back to client
+      res.json({
+        response: response.data.content[0].text
+      });
+      
+      console.log("Successfully sent response back to client");
+    } catch (anthropicError) {
+      console.error('Error calling Anthropic API:', anthropicError.message);
+      
+      if (anthropicError.response) {
+        console.error('Anthropic API Error Response:', {
+          status: anthropicError.response.status,
+          statusText: anthropicError.response.statusText,
+          data: anthropicError.response.data
+        });
+        
+        return res.status(anthropicError.response.status).json({
+          error: `Anthropic API Error: ${anthropicError.response.status} - ${anthropicError.response.statusText}`,
+          details: anthropicError.response.data
+        });
+      } else if (anthropicError.request) {
+        console.error('No response received from Anthropic:', anthropicError.request);
+        return res.status(500).json({
+          error: 'No response received from Anthropic API',
+          details: 'The request was made but no response was received'
+        });
+      } else {
+        console.error('Error setting up Anthropic request:', anthropicError.message);
+        return res.status(500).json({
+          error: 'Error setting up Anthropic request',
+          details: anthropicError.message
+        });
+      }
     }
+  } catch (error) {
+    console.error('Error processing screenshot:', error.message);
     
     // Send appropriate error message
     res.status(500).json({
-      error: error.response?.data?.error?.message || error.message,
-      details: error.response?.data || "No additional error details available"
+      error: 'Server error processing request',
+      details: error.message
     });
     
     console.log("Sent error response to client");
